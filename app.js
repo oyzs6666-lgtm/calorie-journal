@@ -50,6 +50,8 @@ const elements = {
   statsDateLabel: document.querySelector('#stats-date-label'),
   statsDateInput: document.querySelector('#stats-date-input'),
   nextDay: document.querySelector('#next-day'),
+  chartTotalTitle: document.querySelector('#chart-total-title'),
+  chartTotalValue: document.querySelector('#chart-total-value'),
   chart: document.querySelector('#calorie-chart'),
   chartWrap: document.querySelector('#chart-wrap'),
   chartEmpty: document.querySelector('#chart-empty'),
@@ -353,6 +355,9 @@ function addBarGradientStops(gradient, total, yFor, bottom, topY) {
 
 function renderChart() {
   renderStatsFoodRecords();
+  const dailyTotal = calorieEntriesForStats().reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0);
+  elements.chartTotalTitle.textContent = statsDate === dateKey(new Date()) ? '今日总热量' : '当日总热量';
+  elements.chartTotalValue.textContent = dailyTotal.toLocaleString('zh-CN');
   const bounds = elements.chartWrap.getBoundingClientRect();
   if (!bounds.width || !bounds.height) return;
   const canvas = elements.chart;
@@ -370,7 +375,7 @@ function renderChart() {
   elements.chartTooltip.hidden = true;
 
   const compact = bounds.height < 310;
-  const plot = { left: compact ? 34 : 39, right: bounds.width - 4, top: compact ? 13 : 20, bottom: bounds.height - (compact ? 28 : 34) };
+  const plot = { left: compact ? 27 : 30, right: bounds.width - 2, top: compact ? 13 : 20, bottom: bounds.height - (compact ? 28 : 34) };
   const plotHeight = plot.bottom - plot.top;
   const calorieUnit = plotHeight / 11;
   const yFor = (calories) => {
@@ -379,7 +384,7 @@ function renderChart() {
     return plot.bottom - (value / 100) * calorieUnit;
   };
 
-  ctx.font = `${compact ? 8 : 9}px system-ui, sans-serif`;
+  ctx.font = `${compact ? 7 : 8}px system-ui, sans-serif`;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   for (let step = 0; step <= 10; step += 1) {
@@ -392,10 +397,12 @@ function renderChart() {
   }
   ctx.strokeStyle = '#d3cec5';
   ctx.beginPath(); ctx.moveTo(plot.left, plot.top); ctx.lineTo(plot.right, plot.top); ctx.stroke();
+  ctx.font = `${compact ? 6 : 7}px system-ui, sans-serif`;
   ctx.fillStyle = '#8f3340';
   ctx.fillText('>1000', plot.left - 4, plot.top);
 
   const binWidth = (plot.right - plot.left) / TIME_BINS.length;
+  ctx.font = `${compact ? 8 : 9}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   TIME_BINS.forEach((bin, index) => {

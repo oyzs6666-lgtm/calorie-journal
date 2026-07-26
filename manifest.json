@@ -1,0 +1,12 @@
+{
+  "name": "今日热量 · 摄入记录",
+  "short_name": "今日热量",
+  "description": "记录每天的食物与热量，按时间区间查看当日热量柱状图。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f4ee",
+  "theme_color": "#f7f4ee",
+  "lang": "zh-CN",
+  "icons": []
+}

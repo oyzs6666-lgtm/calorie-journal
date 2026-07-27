@@ -389,10 +389,14 @@ function renderChart() {
   ctx.textBaseline = 'middle';
   for (let step = 0; step <= 10; step += 1) {
     const y = plot.bottom - step * calorieUnit;
-    ctx.strokeStyle = step === 0 || step === 10 ? '#d3cec5' : '#e9e5de';
-    ctx.lineWidth = 1;
+    const is400Reference = step === 4;
+    ctx.strokeStyle = is400Reference ? '#68786f' : (step === 0 || step === 10 ? '#d3cec5' : '#e9e5de');
+    ctx.lineWidth = is400Reference ? 1.7 : 1;
+    ctx.setLineDash(is400Reference ? [5, 3] : []);
     ctx.beginPath(); ctx.moveTo(plot.left, y); ctx.lineTo(plot.right, y); ctx.stroke();
-    ctx.fillStyle = '#88847c';
+    ctx.setLineDash([]);
+    ctx.font = `${is400Reference ? '700' : '400'} ${compact ? 7 : 8}px system-ui, sans-serif`;
+    ctx.fillStyle = is400Reference ? '#4f6258' : '#88847c';
     ctx.fillText(String(step * 100), plot.left - 4, y);
   }
   ctx.strokeStyle = '#d3cec5';

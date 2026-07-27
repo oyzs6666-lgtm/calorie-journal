@@ -438,6 +438,21 @@ function renderChart() {
     }
   });
 
+  ctx.font = `600 ${compact ? 7 : 8}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.lineJoin = 'round';
+  chartBars.forEach((bar) => {
+    const label = Number(bar.total).toLocaleString('zh-CN');
+    const centerX = bar.x + bar.width / 2;
+    const labelY = Math.max(compact ? 8 : 10, bar.y - 4);
+    ctx.lineWidth = compact ? 2.5 : 3;
+    ctx.strokeStyle = 'rgba(255,253,249,.96)';
+    ctx.strokeText(label, centerX, labelY);
+    ctx.fillStyle = '#47443e';
+    ctx.fillText(label, centerX, labelY);
+  });
+
   const selected = chartBars.find((bar) => bar.binIndex === selectedBinIndex);
   if (selected) {
     const foods = selected.entries.map((entry) => String(entry.food || '').trim()).filter(Boolean);

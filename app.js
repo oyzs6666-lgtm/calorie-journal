@@ -409,8 +409,8 @@ function renderChart() {
   const plotLeft = compact ? 27 : 30;
   const plotRight = bounds.width - 2;
   const binWidth = (plotRight - plotLeft) / TIME_BINS.length;
-  const foodFontSize = 6;
-  const foodLineHeight = 7;
+  const foodFontSize = 7;
+  const foodLineHeight = 8;
   ctx.font = `${foodFontSize}px system-ui, sans-serif`;
   const over1000LabelLines = groups
     .filter((group) => group.total > 1000)

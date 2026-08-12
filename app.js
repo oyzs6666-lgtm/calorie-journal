@@ -353,6 +353,36 @@ function addBarGradientStops(gradient, total, yFor, bottom, topY) {
   gradient.addColorStop(1, colorForCalories(total));
 }
 
+function foodLabelForGroup(group) {
+  return group.entries
+    .map((entry) => String(entry.food || '').trim())
+    .filter(Boolean)
+    .join('、');
+}
+
+function wrapChartLabel(ctx, text, maxWidth, maxLines = 5) {
+  if (!text) return [];
+  const characters = Array.from(text);
+  const lines = [];
+  let current = '';
+  characters.forEach((character) => {
+    const candidate = current + character;
+    if (current && ctx.measureText(candidate).width > maxWidth) {
+      lines.push(current);
+      current = character;
+    } else {
+      current = candidate;
+    }
+  });
+  if (current) lines.push(current);
+  if (lines.length <= maxLines) return lines;
+  const visible = lines.slice(0, maxLines);
+  let last = visible[maxLines - 1];
+  while (last && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
+  visible[maxLines - 1] = `${last}…`;
+  return visible;
+}
+
 function renderChart() {
   renderStatsFoodRecords();
   const dailyTotal = calorieEntriesForStats().reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0);
@@ -375,7 +405,25 @@ function renderChart() {
   elements.chartTooltip.hidden = true;
 
   const compact = bounds.height < 310;
-  const plot = { left: compact ? 27 : 30, right: bounds.width - 2, top: compact ? 13 : 20, bottom: bounds.height - (compact ? 28 : 34) };
+  const groups = groupedCalories();
+  const plotLeft = compact ? 27 : 30;
+  const plotRight = bounds.width - 2;
+  const binWidth = (plotRight - plotLeft) / TIME_BINS.length;
+  const foodFontSize = 6;
+  const foodLineHeight = 7;
+  ctx.font = `${foodFontSize}px system-ui, sans-serif`;
+  const over1000LabelLines = groups
+    .filter((group) => group.total > 1000)
+    .map((group) => wrapChartLabel(ctx, foodLabelForGroup(group), Math.max(7, binWidth - 2)).length);
+  const over1000TopSpace = over1000LabelLines.length
+    ? Math.max(20, Math.max(...over1000LabelLines) * foodLineHeight + 13)
+    : 0;
+  const plot = {
+    left: plotLeft,
+    right: plotRight,
+    top: (compact ? 13 : 20) + over1000TopSpace,
+    bottom: bounds.height - (compact ? 28 : 34)
+  };
   const plotHeight = plot.bottom - plot.top;
   const calorieUnit = plotHeight / 11;
   const yFor = (calories) => {
@@ -405,7 +453,6 @@ function renderChart() {
   ctx.fillStyle = '#8f3340';
   ctx.fillText('>1000', plot.left - 4, plot.top);
 
-  const binWidth = (plot.right - plot.left) / TIME_BINS.length;
   ctx.font = `${compact ? 8 : 9}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -418,7 +465,6 @@ function renderChart() {
   });
   ctx.beginPath(); ctx.moveTo(plot.right, plot.top); ctx.lineTo(plot.right, plot.bottom); ctx.stroke();
 
-  const groups = groupedCalories();
   elements.chartEmpty.hidden = groups.length > 0;
   const barWidth = Math.max(5, binWidth * 0.62);
   chartBars = groups.map((group) => {
@@ -442,7 +488,8 @@ function renderChart() {
     }
   });
 
-  ctx.font = `600 ${compact ? 7 : 8}px system-ui, sans-serif`;
+  const calorieFontSize = compact ? 7 : 8;
+  ctx.font = `600 ${calorieFontSize}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.lineJoin = 'round';
@@ -455,6 +502,18 @@ function renderChart() {
     ctx.strokeText(label, centerX, labelY);
     ctx.fillStyle = '#47443e';
     ctx.fillText(label, centerX, labelY);
+
+    const foodLabel = foodLabelForGroup(bar);
+    if (!foodLabel) return;
+    ctx.font = `${foodFontSize}px system-ui, sans-serif`;
+    const lines = wrapChartLabel(ctx, foodLabel, Math.max(7, binWidth - 2));
+    const foodBottom = labelY - calorieFontSize - 2;
+    const startY = Math.max(1, foodBottom - lines.length * foodLineHeight);
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#88847c';
+    lines.forEach((line, index) => ctx.fillText(line, centerX, startY + index * foodLineHeight));
+    ctx.font = `600 ${calorieFontSize}px system-ui, sans-serif`;
+    ctx.textBaseline = 'bottom';
   });
 
   const selected = chartBars.find((bar) => bar.binIndex === selectedBinIndex);

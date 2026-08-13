@@ -7,6 +7,7 @@ const LEVEL_COLORS = [
   '#3F6655', '#66845D', '#8DA06A', '#AAB47A', '#C7BB72',
   '#D3A45F', '#DE8B55', '#CF744D', '#B95D47', '#98483F'
 ];
+const OVER_1000_COLOR = '#8A1C1C';
 const TIME_BINS = [
   { start: 0, end: 8, label: '0–8', detailLabel: '0–8' },
   ...Array.from({ length: 13 }, (_, index) => ({
@@ -123,6 +124,7 @@ function makeId() {
 
 function colorForCalories(calories) {
   const value = Math.max(0, Number(calories) || 0);
+  if (value > 1000) return OVER_1000_COLOR;
   const level = Math.max(1, Math.min(10, Math.ceil(value / 100)));
   return LEVEL_COLORS[level - 1];
 }

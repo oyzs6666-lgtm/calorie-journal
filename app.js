@@ -4,7 +4,7 @@ const UI_KEY = 'calorie-journal.ui.v1';
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
 const LEVEL_COLORS = [
-  '#3F6655', '#66845D', '#8DA06A', '#AAB47A', '#C7BB72',
+  '#234B3B', '#3F6655', '#66845D', '#8DA06A', '#AAB47A', '#C7BB72',
   '#D3A45F', '#DE8B55', '#CF744D', '#B95D47', '#98483F', '#8A1C1C'
 ];
 const TIME_BINS = [
@@ -123,9 +123,8 @@ function makeId() {
 
 function colorForCalories(calories) {
   const value = Math.max(0, Number(calories) || 0);
-  if (value <= 100) return LEVEL_COLORS[0];
-  if (value >= 1100) return LEVEL_COLORS[10];
-  const position = value / 100 - 1;
+  if (value >= 1100) return LEVEL_COLORS[11];
+  const position = value / 100;
   const lowerIndex = Math.floor(position);
   const upperIndex = Math.ceil(position);
   if (lowerIndex === upperIndex) return LEVEL_COLORS[lowerIndex];

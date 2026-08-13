@@ -5,9 +5,8 @@ if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
 const LEVEL_COLORS = [
   '#3F6655', '#66845D', '#8DA06A', '#AAB47A', '#C7BB72',
-  '#D3A45F', '#DE8B55', '#CF744D', '#B95D47', '#98483F'
+  '#D3A45F', '#DE8B55', '#CF744D', '#B95D47', '#98483F', '#8A1C1C'
 ];
-const OVER_1000_COLOR = '#8A1C1C';
 const TIME_BINS = [
   { start: 0, end: 8, label: '0–8', detailLabel: '0–8' },
   ...Array.from({ length: 13 }, (_, index) => ({
@@ -124,9 +123,19 @@ function makeId() {
 
 function colorForCalories(calories) {
   const value = Math.max(0, Number(calories) || 0);
-  if (value > 1000) return OVER_1000_COLOR;
-  const level = Math.max(1, Math.min(10, Math.ceil(value / 100)));
-  return LEVEL_COLORS[level - 1];
+  if (value <= 100) return LEVEL_COLORS[0];
+  if (value >= 1100) return LEVEL_COLORS[10];
+  const position = value / 100 - 1;
+  const lowerIndex = Math.floor(position);
+  const upperIndex = Math.ceil(position);
+  if (lowerIndex === upperIndex) return LEVEL_COLORS[lowerIndex];
+  return mixHexColors(LEVEL_COLORS[lowerIndex], LEVEL_COLORS[upperIndex], position - lowerIndex);
+}
+
+function mixHexColors(first, second, amount) {
+  const channel = (hex, start) => parseInt(hex.slice(start, start + 2), 16);
+  const blend = (start, end) => Math.round(start + (end - start) * amount).toString(16).padStart(2, '0');
+  return `#${blend(channel(first, 1), channel(second, 1))}${blend(channel(first, 3), channel(second, 3))}${blend(channel(first, 5), channel(second, 5))}`;
 }
 
 function roundedBarPath(ctx, x, y, width, height, radius) {

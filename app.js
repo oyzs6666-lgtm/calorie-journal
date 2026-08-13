@@ -4,11 +4,9 @@ const UI_KEY = 'calorie-journal.ui.v1';
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
 const LEVEL_COLORS = [
-  '#2d70b7', '#347fc0', '#3e91bd', '#46a5ad', '#62b593',
-  '#9ebd62', '#d1b94e', '#e7a245', '#eb793f', '#e84f49'
+  '#3F6655', '#66845D', '#8DA06A', '#AAB47A', '#C7BB72',
+  '#D3A45F', '#DE8B55', '#CF744D', '#B95D47', '#98483F'
 ];
-const ZERO_COLOR = '#245a98';
-const OVER_1000_COLOR = '#9f2035';
 const TIME_BINS = [
   { start: 0, end: 8, label: '0–8', detailLabel: '0–8' },
   ...Array.from({ length: 13 }, (_, index) => ({
@@ -123,29 +121,24 @@ function makeId() {
   return crypto.randomUUID?.() || `calorie-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function hexToRgb(hex) {
-  return {
-    r: parseInt(hex.slice(1, 3), 16),
-    g: parseInt(hex.slice(3, 5), 16),
-    b: parseInt(hex.slice(5, 7), 16)
-  };
-}
-
-function mixColors(first, second, amount) {
-  const a = hexToRgb(first);
-  const b = hexToRgb(second);
-  const mix = (start, end) => Math.round(start + (end - start) * amount).toString(16).padStart(2, '0');
-  return `#${mix(a.r, b.r)}${mix(a.g, b.g)}${mix(a.b, b.b)}`;
-}
-
 function colorForCalories(calories) {
   const value = Math.max(0, Number(calories) || 0);
-  if (value <= 100) return mixColors(ZERO_COLOR, LEVEL_COLORS[0], value / 100);
-  if (value >= 1000) return value > 1000 ? OVER_1000_COLOR : LEVEL_COLORS[9];
-  const lowerLevel = Math.floor(value / 100);
-  const upperLevel = Math.ceil(value / 100);
-  if (lowerLevel === upperLevel) return LEVEL_COLORS[lowerLevel - 1];
-  return mixColors(LEVEL_COLORS[lowerLevel - 1], LEVEL_COLORS[upperLevel - 1], (value % 100) / 100);
+  const level = Math.max(1, Math.min(10, Math.ceil(value / 100)));
+  return LEVEL_COLORS[level - 1];
+}
+
+function roundedBarPath(ctx, x, y, width, height, radius) {
+  const safeRadius = Math.max(0, Math.min(radius, width / 2, height / 2));
+  ctx.beginPath();
+  ctx.moveTo(x, y + safeRadius);
+  ctx.quadraticCurveTo(x, y, x + safeRadius, y);
+  ctx.lineTo(x + width - safeRadius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+  ctx.lineTo(x + width, y + height - safeRadius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+  ctx.lineTo(x + safeRadius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+  ctx.closePath();
 }
 
 function entriesForDate(key) {
@@ -341,18 +334,6 @@ function renderStatsFoodRecords() {
   </article>`).join('');
 }
 
-function addBarGradientStops(gradient, total, yFor, bottom, topY) {
-  gradient.addColorStop(0, ZERO_COLOR);
-  const denominator = Math.max(1, bottom - topY);
-  const highestThreshold = Math.min(1000, Math.floor(total / 100) * 100);
-  for (let threshold = 100; threshold <= highestThreshold; threshold += 100) {
-    if (threshold >= total) break;
-    const stop = Math.max(0, Math.min(1, (bottom - yFor(threshold)) / denominator));
-    gradient.addColorStop(stop, colorForCalories(threshold));
-  }
-  gradient.addColorStop(1, colorForCalories(total));
-}
-
 function foodLabelForGroup(group) {
   return group.entries
     .map((entry) => String(entry.food || '').trim())
@@ -474,17 +455,19 @@ function renderChart() {
   });
 
   chartBars.forEach((bar) => {
-    const gradient = ctx.createLinearGradient(0, plot.bottom, 0, bar.y);
-    addBarGradientStops(gradient, bar.total, yFor, plot.bottom, bar.y);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(bar.x, bar.y, bar.width, bar.height);
+    const radius = Math.min(4, bar.width * .28);
+    ctx.fillStyle = colorForCalories(bar.total);
+    roundedBarPath(ctx, bar.x, bar.y, bar.width, bar.height, radius);
+    ctx.fill();
     if (bar.binIndex === selectedBinIndex) {
       ctx.strokeStyle = '#fffdf9';
       ctx.lineWidth = 4;
-      ctx.strokeRect(bar.x - 2, bar.y - 2, bar.width + 4, bar.height + 4);
+      roundedBarPath(ctx, bar.x - 2, bar.y - 2, bar.width + 4, bar.height + 4, radius + 2);
+      ctx.stroke();
       ctx.strokeStyle = '#24231f';
       ctx.lineWidth = 2;
-      ctx.strokeRect(bar.x - 2, bar.y - 2, bar.width + 4, bar.height + 4);
+      roundedBarPath(ctx, bar.x - 2, bar.y - 2, bar.width + 4, bar.height + 4, radius + 2);
+      ctx.stroke();
     }
   });
 

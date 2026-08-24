@@ -48,8 +48,6 @@ const elements = {
   statsDateLabel: document.querySelector('#stats-date-label'),
   statsDateInput: document.querySelector('#stats-date-input'),
   nextDay: document.querySelector('#next-day'),
-  chartTotalTitle: document.querySelector('#chart-total-title'),
-  chartTotalValue: document.querySelector('#chart-total-value'),
   chart: document.querySelector('#calorie-chart'),
   chartWrap: document.querySelector('#chart-wrap'),
   chartEmpty: document.querySelector('#chart-empty'),
@@ -376,9 +374,6 @@ function wrapChartLabel(ctx, text, maxWidth, maxLines = 5) {
 
 function renderChart() {
   renderStatsFoodRecords();
-  const dailyTotal = calorieEntriesForStats().reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0);
-  elements.chartTotalTitle.textContent = statsDate === dateKey(new Date()) ? '今日总热量' : '当日总热量';
-  elements.chartTotalValue.textContent = dailyTotal.toLocaleString('zh-CN');
   const bounds = elements.chartWrap.getBoundingClientRect();
   if (!bounds.width || !bounds.height) return;
   const canvas = elements.chart;

@@ -171,7 +171,7 @@ function updateQuickSaveButton() {
   const calories = Number(elements.quickCalories.value);
   const valid = Number.isFinite(calories) && calories > 0;
   elements.quickSaveButton.disabled = !valid;
-  elements.quickSaveButton.textContent = valid ? `记录 ${calories}` : '记录';
+  elements.quickSaveButton.textContent = '记录';
 }
 
 function formatCalculatorNumber(value, precision = 6) {
@@ -182,7 +182,7 @@ function formatCalculatorNumber(value, precision = 6) {
 
 function evaluateCalculatorExpression(expression = calculatorExpression) {
   const clean = String(expression || '').trim();
-  if (!clean || clean.length > 120 || !/^[0-9+\-*/.\s]+$/.test(clean) || /[+\-*/.]$/.test(clean)) return null;
+  if (!clean || clean.length > 120 || !/^[0-9+\-*/.()\s]+$/.test(clean) || /[+\-*/.(]$/.test(clean)) return null;
   try {
     const value = Function(`"use strict"; return (${clean})`)();
     return Number.isFinite(value) ? value : null;
@@ -193,7 +193,7 @@ function evaluateCalculatorExpression(expression = calculatorExpression) {
 
 function calculatorDisplayExpression() {
   const source = calculatorJustEvaluated && calculatorHistory ? calculatorHistory : calculatorExpression;
-  return source.replaceAll('*', '×').replaceAll('/', '÷').replaceAll('-', '−').replaceAll('+', '＋') || '\u00a0';
+  return source.replaceAll('*', '×').replaceAll('/', '÷').replaceAll('-', '−').replaceAll('+', '＋').replaceAll('(', '（').replaceAll(')', '）') || '\u00a0';
 }
 
 function commitCalculatorResult() {
@@ -221,12 +221,38 @@ function openCalculator() {
 }
 
 function appendCalculatorValue(value) {
+  if (value === '(') {
+    if (calculatorJustEvaluated) {
+      calculatorExpression = '';
+      calculatorHistory = '';
+      calculatorJustEvaluated = false;
+    }
+    calculatorExpression += !calculatorExpression || /[+\-*/(]$/.test(calculatorExpression) ? '(' : '*(';
+    renderCalculator();
+    return;
+  }
+  if (value === ')') {
+    const openCount = (calculatorExpression.match(/\(/g) || []).length;
+    const closeCount = (calculatorExpression.match(/\)/g) || []).length;
+    if (openCount > closeCount && calculatorExpression && !/[+\-*/.(]$/.test(calculatorExpression)) {
+      calculatorExpression += ')';
+      calculatorHistory = '';
+      calculatorJustEvaluated = false;
+      renderCalculator();
+    }
+    return;
+  }
   const isOperator = ['+', '-', '*', '/'].includes(value);
   if (isOperator) {
     calculatorHistory = '';
     calculatorJustEvaluated = false;
     if (!calculatorExpression) {
       if (value === '-') calculatorExpression = '-';
+      renderCalculator();
+      return;
+    }
+    if (calculatorExpression.endsWith('(')) {
+      if (value === '-') calculatorExpression += '-';
       renderCalculator();
       return;
     }
@@ -241,7 +267,8 @@ function appendCalculatorValue(value) {
     calculatorHistory = '';
     calculatorJustEvaluated = false;
   }
-  const currentPart = calculatorExpression.split(/[+\-*/]/).pop() || '';
+  if (calculatorExpression.endsWith(')')) calculatorExpression += '*';
+  const currentPart = calculatorExpression.split(/[+\-*/()]/).pop() || '';
   if (value === '.' && currentPart.includes('.')) return;
   if (value === '.' && (!calculatorExpression || /[+\-*/]$/.test(calculatorExpression))) calculatorExpression += '0';
   calculatorExpression += value;
@@ -259,22 +286,6 @@ function runCalculatorCommand(command) {
     calculatorHistory = '';
     calculatorJustEvaluated = false;
     if (!calculatorExpression) calculatorResult = 0;
-  } else if (command === 'percent') {
-    const value = evaluateCalculatorExpression();
-    if (value !== null) {
-      calculatorExpression = String(Math.round(value / 100));
-      calculatorResult = Math.round(value / 100);
-      calculatorHistory = '';
-      calculatorJustEvaluated = true;
-    }
-  } else if (command === 'sign') {
-    const value = evaluateCalculatorExpression();
-    if (value !== null) {
-      calculatorExpression = String(Math.round(-value));
-      calculatorResult = Math.round(-value);
-      calculatorHistory = '';
-      calculatorJustEvaluated = true;
-    }
   } else if (command === 'equals') {
     const value = evaluateCalculatorExpression();
     if (value !== null) {

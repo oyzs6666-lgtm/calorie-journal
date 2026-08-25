@@ -212,10 +212,15 @@ function renderCalculator() {
 
 function openCalculator() {
   const existing = Number(elements.quickCalories.value);
-  calculatorExpression = Number.isFinite(existing) && existing > 0 ? String(Math.round(existing)) : '';
-  calculatorResult = Number.isFinite(existing) && existing > 0 ? Math.round(existing) : 0;
-  calculatorHistory = '';
-  calculatorJustEvaluated = false;
+  const existingRounded = Number.isFinite(existing) && existing > 0 ? Math.round(existing) : 0;
+  const draftValue = evaluateCalculatorExpression();
+  const draftRounded = draftValue === null ? 0 : Math.round(draftValue);
+  if (!calculatorExpression || existingRounded !== draftRounded) {
+    calculatorExpression = existingRounded > 0 ? String(existingRounded) : '';
+    calculatorResult = existingRounded;
+    calculatorHistory = '';
+    calculatorJustEvaluated = false;
+  }
   renderCalculator();
   elements.calculatorDialog.showModal();
 }
@@ -345,8 +350,12 @@ function saveQuickRecord(event) {
     return;
   }
   elements.quickCalories.value = '';
+  calculatorExpression = '';
+  calculatorHistory = '';
+  calculatorResult = 0;
+  calculatorJustEvaluated = false;
   updateQuickSaveButton();
-  selectedBinIndex = binIndexForEntry(record);
+  selectedBinIndex = null;
   renderChart();
   showToast('热量记录已保存');
 }

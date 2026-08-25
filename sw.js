@@ -1,5 +1,5 @@
-const CACHE_NAME = 'calorie-journal-v14';
-const APP_FILES = ['./', './index.html', './styles.css?v=14', './app.js?v=14', './manifest.json'];
+const CACHE_NAME = 'calorie-journal-v17';
+const APP_FILES = ['./', './index.html', './styles.css?v=17', './app.js?v=17', './manifest.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_FILES)).then(() => self.skipWaiting()));

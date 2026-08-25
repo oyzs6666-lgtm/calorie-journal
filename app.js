@@ -198,13 +198,13 @@ function calculatorDisplayExpression() {
 
 function commitCalculatorResult() {
   if (!Number.isFinite(calculatorResult) || calculatorResult <= 0) return;
-  elements.quickCalories.value = formatCalculatorNumber(calculatorResult, 2);
+  elements.quickCalories.value = String(Math.round(calculatorResult));
   updateQuickSaveButton();
 }
 
 function renderCalculator() {
   const evaluated = evaluateCalculatorExpression();
-  if (evaluated !== null) calculatorResult = evaluated;
+  if (evaluated !== null) calculatorResult = Math.round(evaluated);
   elements.calculatorExpression.textContent = calculatorDisplayExpression();
   elements.calculatorResult.textContent = Number(calculatorResult).toLocaleString('zh-CN', { maximumFractionDigits: 6 });
   commitCalculatorResult();
@@ -212,8 +212,8 @@ function renderCalculator() {
 
 function openCalculator() {
   const existing = Number(elements.quickCalories.value);
-  calculatorExpression = Number.isFinite(existing) && existing > 0 ? formatCalculatorNumber(existing, 2) : '';
-  calculatorResult = Number.isFinite(existing) && existing > 0 ? existing : 0;
+  calculatorExpression = Number.isFinite(existing) && existing > 0 ? String(Math.round(existing)) : '';
+  calculatorResult = Number.isFinite(existing) && existing > 0 ? Math.round(existing) : 0;
   calculatorHistory = '';
   calculatorJustEvaluated = false;
   renderCalculator();
@@ -262,16 +262,16 @@ function runCalculatorCommand(command) {
   } else if (command === 'percent') {
     const value = evaluateCalculatorExpression();
     if (value !== null) {
-      calculatorExpression = formatCalculatorNumber(value / 100);
-      calculatorResult = value / 100;
+      calculatorExpression = String(Math.round(value / 100));
+      calculatorResult = Math.round(value / 100);
       calculatorHistory = '';
       calculatorJustEvaluated = true;
     }
   } else if (command === 'sign') {
     const value = evaluateCalculatorExpression();
     if (value !== null) {
-      calculatorExpression = formatCalculatorNumber(-value);
-      calculatorResult = -value;
+      calculatorExpression = String(Math.round(-value));
+      calculatorResult = Math.round(-value);
       calculatorHistory = '';
       calculatorJustEvaluated = true;
     }
@@ -279,8 +279,8 @@ function runCalculatorCommand(command) {
     const value = evaluateCalculatorExpression();
     if (value !== null) {
       calculatorHistory = calculatorExpression;
-      calculatorExpression = formatCalculatorNumber(value);
-      calculatorResult = value;
+      calculatorExpression = String(Math.round(value));
+      calculatorResult = Math.round(value);
       calculatorJustEvaluated = true;
     }
   }
@@ -290,8 +290,8 @@ function runCalculatorCommand(command) {
 function updateKilojouleConversion() {
   const kilojoules = Number(elements.kilojoulesPer100.value);
   const weight = Number(elements.foodWeight.value);
-  const converted = kilojoules > 0 && weight > 0 ? kilojoules * weight / 418.4 : 0;
-  elements.convertedKcal.textContent = converted > 0 ? Number(formatCalculatorNumber(converted, 1)).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) : '0';
+  const converted = kilojoules > 0 && weight > 0 ? Math.round(kilojoules * weight / 418.4) : 0;
+  elements.convertedKcal.textContent = converted > 0 ? converted.toLocaleString('zh-CN') : '0';
   elements.addConvertedButton.disabled = !(converted > 0 && Number.isFinite(converted));
   return converted;
 }
@@ -299,7 +299,7 @@ function updateKilojouleConversion() {
 function addConvertedCalories() {
   const converted = updateKilojouleConversion();
   if (!(converted > 0)) return;
-  const value = formatCalculatorNumber(converted, 2);
+  const value = String(converted);
   const current = evaluateCalculatorExpression();
   if (!calculatorExpression || current === 0) calculatorExpression = value;
   else if (/[+\-*/]$/.test(calculatorExpression)) calculatorExpression += value;

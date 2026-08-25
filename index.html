@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="今日热量">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="stylesheet" href="styles.css?v=14">
   <title>今日热量 · 摄入记录</title>
 </head>
 <body class="stats-active">
@@ -47,6 +47,7 @@
             <input id="quick-calories" type="number" min="1" max="99999" inputmode="decimal" placeholder="输入热量">
             <span>kcal</span>
           </label>
+          <button class="calculator-open-button" id="calculator-open-button" type="button" aria-label="打开计算器">▦</button>
           <button class="quick-save-button" id="quick-save-button" type="submit" disabled>记录</button>
         </form>
         <p class="chart-action-hint">保存时使用当前时间；长按柱子可修改热量、时间或删除。</p>
@@ -93,8 +94,47 @@
     </div>
   </dialog>
 
+  <dialog class="calculator-dialog" id="calculator-dialog" aria-label="热量计算器">
+    <section class="calculator-panel">
+      <div class="calculator-display" aria-live="polite">
+        <span id="calculator-expression">&nbsp;</span>
+        <output id="calculator-result">0</output>
+      </div>
+      <div class="calculator-grid" id="calculator-grid">
+        <button class="calculator-key function-key" type="button" data-calc-command="backspace" aria-label="退格">⌫</button>
+        <button class="calculator-key function-key" type="button" data-calc-command="clear">AC</button>
+        <button class="calculator-key function-key" type="button" data-calc-command="percent">%</button>
+        <button class="calculator-key operator-key" type="button" data-calc-value="/">÷</button>
+        <button class="calculator-key" type="button" data-calc-value="7">7</button>
+        <button class="calculator-key" type="button" data-calc-value="8">8</button>
+        <button class="calculator-key" type="button" data-calc-value="9">9</button>
+        <button class="calculator-key operator-key" type="button" data-calc-value="*">×</button>
+        <button class="calculator-key" type="button" data-calc-value="4">4</button>
+        <button class="calculator-key" type="button" data-calc-value="5">5</button>
+        <button class="calculator-key" type="button" data-calc-value="6">6</button>
+        <button class="calculator-key operator-key" type="button" data-calc-value="-">−</button>
+        <button class="calculator-key" type="button" data-calc-value="1">1</button>
+        <button class="calculator-key" type="button" data-calc-value="2">2</button>
+        <button class="calculator-key" type="button" data-calc-value="3">3</button>
+        <button class="calculator-key operator-key" type="button" data-calc-value="+">＋</button>
+        <button class="calculator-key function-key" type="button" data-calc-command="sign">＋/−</button>
+        <button class="calculator-key" type="button" data-calc-value="0">0</button>
+        <button class="calculator-key" type="button" data-calc-value=".">.</button>
+        <button class="calculator-key operator-key" type="button" data-calc-command="equals">＝</button>
+      </div>
+      <section class="kilojoule-converter">
+        <div class="converter-heading"><strong>千焦换算</strong><output><span id="converted-kcal">0</span> kcal</output></div>
+        <div class="converter-fields">
+          <label><span>千焦数（每100g）</span><input id="kilojoules-per-100" type="number" min="0" inputmode="decimal" placeholder="例如 1600"></label>
+          <label><span>重量（g）</span><input id="food-weight" type="number" min="0" inputmode="decimal" placeholder="例如 50"></label>
+        </div>
+        <button class="add-converted-button" id="add-converted-button" type="button" disabled>加入上方计算器</button>
+      </section>
+    </section>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
   <script>
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       navigator.serviceWorker.register('./sw.js').catch(() => {});

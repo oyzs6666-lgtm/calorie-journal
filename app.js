@@ -29,6 +29,10 @@ let toastTimer;
 let longPressTimer = null;
 let longPressStart = null;
 let longPressTriggered = false;
+let calculatorExpression = '';
+let calculatorHistory = '';
+let calculatorResult = 0;
+let calculatorJustEvaluated = false;
 
 const elements = {
   todayLabel: document.querySelector('#today-label'),
@@ -36,6 +40,15 @@ const elements = {
   quickEntryForm: document.querySelector('#quick-entry-form'),
   quickCalories: document.querySelector('#quick-calories'),
   quickSaveButton: document.querySelector('#quick-save-button'),
+  calculatorOpenButton: document.querySelector('#calculator-open-button'),
+  calculatorDialog: document.querySelector('#calculator-dialog'),
+  calculatorGrid: document.querySelector('#calculator-grid'),
+  calculatorExpression: document.querySelector('#calculator-expression'),
+  calculatorResult: document.querySelector('#calculator-result'),
+  kilojoulesPer100: document.querySelector('#kilojoules-per-100'),
+  foodWeight: document.querySelector('#food-weight'),
+  convertedKcal: document.querySelector('#converted-kcal'),
+  addConvertedButton: document.querySelector('#add-converted-button'),
   editRecordDialog: document.querySelector('#edit-record-dialog'),
   editRecordForm: document.querySelector('#edit-record-form'),
   editFoodCalories: document.querySelector('#edit-food-calories'),
@@ -159,6 +172,141 @@ function updateQuickSaveButton() {
   const valid = Number.isFinite(calories) && calories > 0;
   elements.quickSaveButton.disabled = !valid;
   elements.quickSaveButton.textContent = valid ? `记录 ${calories}` : '记录';
+}
+
+function formatCalculatorNumber(value, precision = 6) {
+  if (!Number.isFinite(value)) return '0';
+  const rounded = Math.round((value + Number.EPSILON) * 10 ** precision) / 10 ** precision;
+  return String(Object.is(rounded, -0) ? 0 : rounded);
+}
+
+function evaluateCalculatorExpression(expression = calculatorExpression) {
+  const clean = String(expression || '').trim();
+  if (!clean || clean.length > 120 || !/^[0-9+\-*/.\s]+$/.test(clean) || /[+\-*/.]$/.test(clean)) return null;
+  try {
+    const value = Function(`"use strict"; return (${clean})`)();
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function calculatorDisplayExpression() {
+  const source = calculatorJustEvaluated && calculatorHistory ? calculatorHistory : calculatorExpression;
+  return source.replaceAll('*', '×').replaceAll('/', '÷').replaceAll('-', '−').replaceAll('+', '＋') || '\u00a0';
+}
+
+function commitCalculatorResult() {
+  if (!Number.isFinite(calculatorResult) || calculatorResult <= 0) return;
+  elements.quickCalories.value = formatCalculatorNumber(calculatorResult, 2);
+  updateQuickSaveButton();
+}
+
+function renderCalculator() {
+  const evaluated = evaluateCalculatorExpression();
+  if (evaluated !== null) calculatorResult = evaluated;
+  elements.calculatorExpression.textContent = calculatorDisplayExpression();
+  elements.calculatorResult.textContent = Number(calculatorResult).toLocaleString('zh-CN', { maximumFractionDigits: 6 });
+  commitCalculatorResult();
+}
+
+function openCalculator() {
+  const existing = Number(elements.quickCalories.value);
+  calculatorExpression = Number.isFinite(existing) && existing > 0 ? formatCalculatorNumber(existing, 2) : '';
+  calculatorResult = Number.isFinite(existing) && existing > 0 ? existing : 0;
+  calculatorHistory = '';
+  calculatorJustEvaluated = false;
+  renderCalculator();
+  elements.calculatorDialog.showModal();
+}
+
+function appendCalculatorValue(value) {
+  const isOperator = ['+', '-', '*', '/'].includes(value);
+  if (isOperator) {
+    calculatorHistory = '';
+    calculatorJustEvaluated = false;
+    if (!calculatorExpression) {
+      if (value === '-') calculatorExpression = '-';
+      renderCalculator();
+      return;
+    }
+    calculatorExpression = /[+\-*/]$/.test(calculatorExpression)
+      ? `${calculatorExpression.slice(0, -1)}${value}`
+      : `${calculatorExpression}${value}`;
+    renderCalculator();
+    return;
+  }
+  if (calculatorJustEvaluated) {
+    calculatorExpression = '';
+    calculatorHistory = '';
+    calculatorJustEvaluated = false;
+  }
+  const currentPart = calculatorExpression.split(/[+\-*/]/).pop() || '';
+  if (value === '.' && currentPart.includes('.')) return;
+  if (value === '.' && (!calculatorExpression || /[+\-*/]$/.test(calculatorExpression))) calculatorExpression += '0';
+  calculatorExpression += value;
+  renderCalculator();
+}
+
+function runCalculatorCommand(command) {
+  if (command === 'clear') {
+    calculatorExpression = '';
+    calculatorHistory = '';
+    calculatorResult = 0;
+    calculatorJustEvaluated = false;
+  } else if (command === 'backspace') {
+    calculatorExpression = calculatorJustEvaluated ? '' : calculatorExpression.slice(0, -1);
+    calculatorHistory = '';
+    calculatorJustEvaluated = false;
+    if (!calculatorExpression) calculatorResult = 0;
+  } else if (command === 'percent') {
+    const value = evaluateCalculatorExpression();
+    if (value !== null) {
+      calculatorExpression = formatCalculatorNumber(value / 100);
+      calculatorResult = value / 100;
+      calculatorHistory = '';
+      calculatorJustEvaluated = true;
+    }
+  } else if (command === 'sign') {
+    const value = evaluateCalculatorExpression();
+    if (value !== null) {
+      calculatorExpression = formatCalculatorNumber(-value);
+      calculatorResult = -value;
+      calculatorHistory = '';
+      calculatorJustEvaluated = true;
+    }
+  } else if (command === 'equals') {
+    const value = evaluateCalculatorExpression();
+    if (value !== null) {
+      calculatorHistory = calculatorExpression;
+      calculatorExpression = formatCalculatorNumber(value);
+      calculatorResult = value;
+      calculatorJustEvaluated = true;
+    }
+  }
+  renderCalculator();
+}
+
+function updateKilojouleConversion() {
+  const kilojoules = Number(elements.kilojoulesPer100.value);
+  const weight = Number(elements.foodWeight.value);
+  const converted = kilojoules > 0 && weight > 0 ? kilojoules * weight / 418.4 : 0;
+  elements.convertedKcal.textContent = converted > 0 ? Number(formatCalculatorNumber(converted, 1)).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) : '0';
+  elements.addConvertedButton.disabled = !(converted > 0 && Number.isFinite(converted));
+  return converted;
+}
+
+function addConvertedCalories() {
+  const converted = updateKilojouleConversion();
+  if (!(converted > 0)) return;
+  const value = formatCalculatorNumber(converted, 2);
+  const current = evaluateCalculatorExpression();
+  if (!calculatorExpression || current === 0) calculatorExpression = value;
+  else if (/[+\-*/]$/.test(calculatorExpression)) calculatorExpression += value;
+  else calculatorExpression += `+${value}`;
+  calculatorHistory = '';
+  calculatorJustEvaluated = false;
+  renderCalculator();
 }
 
 function saveQuickRecord(event) {
@@ -470,6 +618,22 @@ function showToast(message) {
 
 elements.quickCalories.addEventListener('input', updateQuickSaveButton);
 elements.quickEntryForm.addEventListener('submit', saveQuickRecord);
+elements.calculatorOpenButton.addEventListener('click', openCalculator);
+elements.calculatorGrid.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-calc-value],[data-calc-command]');
+  if (!button) return;
+  if (button.dataset.calcCommand) runCalculatorCommand(button.dataset.calcCommand);
+  else appendCalculatorValue(button.dataset.calcValue);
+});
+elements.kilojoulesPer100.addEventListener('input', updateKilojouleConversion);
+elements.foodWeight.addEventListener('input', updateKilojouleConversion);
+elements.addConvertedButton.addEventListener('click', addConvertedCalories);
+elements.calculatorDialog.addEventListener('click', (event) => {
+  if (event.target !== elements.calculatorDialog) return;
+  commitCalculatorResult();
+  elements.calculatorDialog.close();
+});
+elements.calculatorDialog.addEventListener('close', commitCalculatorResult);
 elements.editRecordForm.addEventListener('submit', saveEditedRecord);
 elements.deleteEditRecord.addEventListener('click', () => { if (editingId) deleteRecord(editingId); });
 document.querySelectorAll('[data-close-edit]').forEach((button) => button.addEventListener('click', () => {

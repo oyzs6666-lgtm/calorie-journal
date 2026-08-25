@@ -22,29 +22,27 @@ let entries = loadArray(ENTRY_KEY);
 let uiState = loadObject(UI_KEY);
 let statsDate = /^\d{4}-\d{2}-\d{2}$/.test(uiState.statsDate || '') ? uiState.statsDate : dateKey(new Date());
 if (statsDate > dateKey(new Date())) statsDate = dateKey(new Date());
-let currentView = uiState.view === 'stats' ? 'stats' : 'record';
 let editingId = null;
 let selectedBinIndex = null;
 let chartBars = [];
 let toastTimer;
-let scrollSaveTimer;
+let longPressTimer = null;
+let longPressStart = null;
+let longPressTriggered = false;
 
 const elements = {
   todayLabel: document.querySelector('#today-label'),
-  todayCalories: document.querySelector('#today-calories'),
-  foodName: document.querySelector('#food-name'),
-  foodCalories: document.querySelector('#food-calories'),
-  saveButton: document.querySelector('#save-button'),
-  todayRecords: document.querySelector('#today-records'),
-  entryCount: document.querySelector('#entry-count'),
-  recordView: document.querySelector('#record-view'),
   statsView: document.querySelector('#stats-view'),
-  navButtons: [...document.querySelectorAll('.nav-button')],
+  quickEntryForm: document.querySelector('#quick-entry-form'),
+  quickCalories: document.querySelector('#quick-calories'),
+  quickSaveButton: document.querySelector('#quick-save-button'),
   editRecordDialog: document.querySelector('#edit-record-dialog'),
   editRecordForm: document.querySelector('#edit-record-form'),
-  editFoodName: document.querySelector('#edit-food-name'),
   editFoodCalories: document.querySelector('#edit-food-calories'),
   editRecordTime: document.querySelector('#edit-record-time'),
+  deleteEditRecord: document.querySelector('#delete-edit-record'),
+  recordChoiceDialog: document.querySelector('#record-choice-dialog'),
+  recordChoiceList: document.querySelector('#record-choice-list'),
   statsDateLabel: document.querySelector('#stats-date-label'),
   statsDateInput: document.querySelector('#stats-date-input'),
   nextDay: document.querySelector('#next-day'),
@@ -52,7 +50,6 @@ const elements = {
   chartWrap: document.querySelector('#chart-wrap'),
   chartEmpty: document.querySelector('#chart-empty'),
   chartTooltip: document.querySelector('#chart-tooltip'),
-  statsFoodRecords: document.querySelector('#stats-food-records'),
   toast: document.querySelector('#toast')
 };
 
@@ -83,8 +80,6 @@ function persistUiState() {
 }
 
 function rememberUiState() {
-  if (currentView === 'record') uiState.recordScroll = Math.max(0, window.scrollY || 0);
-  uiState.view = currentView;
   uiState.statsDate = statsDate;
   persistUiState();
 }
@@ -155,44 +150,31 @@ function entriesForDate(key) {
     .sort((first, second) => new Date(first.timestamp) - new Date(second.timestamp));
 }
 
-function renderHome() {
-  const today = dateKey(new Date());
-  const records = entriesForDate(today).slice().reverse();
-  const total = records.reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0);
-  elements.todayLabel.textContent = formatDate(today);
-  elements.todayCalories.textContent = total.toLocaleString('zh-CN');
-  elements.entryCount.textContent = `${records.length} 条`;
-  elements.todayRecords.innerHTML = records.length ? records.map((entry) => {
-    const calories = Number(entry.calories) || 0;
-    const food = String(entry.food || '').trim() || '未填写食物名称';
-    return `<article class="record-row">
-      <button class="record-edit-button" type="button" data-edit="${entry.id}" aria-label="编辑${formatTime(entry.timestamp)}的记录">
-        <span class="record-calorie-badge" style="--calorie-color:${colorForCalories(calories)}"><strong>${calories}</strong><small>kcal</small></span>
-        <span class="record-main"><strong>${escapeHtml(food)}</strong><span>${calories} kcal</span></span>
-        <time class="record-time" datetime="${entry.timestamp}">${formatTime(entry.timestamp)}</time>
-      </button>
-      <button class="delete-record" type="button" data-delete="${entry.id}" aria-label="删除${formatTime(entry.timestamp)}的记录">×</button>
-    </article>`;
-  }).join('') : '<p class="empty-records">今天还没有热量记录。</p>';
+function renderHeader() {
+  elements.todayLabel.textContent = formatDate(dateKey(new Date()));
 }
 
-function updateSaveButton() {
-  const calories = Number(elements.foodCalories.value);
+function updateQuickSaveButton() {
+  const calories = Number(elements.quickCalories.value);
   const valid = Number.isFinite(calories) && calories > 0;
-  elements.saveButton.disabled = !valid;
-  elements.saveButton.textContent = valid ? `记录 ${calories} kcal` : '填写热量后记录';
+  elements.quickSaveButton.disabled = !valid;
+  elements.quickSaveButton.textContent = valid ? `记录 ${calories}` : '记录';
 }
 
-function saveRecord() {
-  const calories = Number(elements.foodCalories.value);
+function saveQuickRecord(event) {
+  event.preventDefault();
+  const calories = Number(elements.quickCalories.value);
   if (!Number.isFinite(calories) || calories <= 0 || calories > 99999) {
     showToast('请填写有效的热量数字');
     return;
   }
+  const now = new Date();
+  const selectedDate = dateFromKey(statsDate);
+  selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
   const record = {
     id: makeId(),
-    timestamp: new Date().toISOString(),
-    food: elements.foodName.value.trim(),
+    timestamp: selectedDate.toISOString(),
+    food: '',
     calories
   };
   entries.push(record);
@@ -203,11 +185,10 @@ function saveRecord() {
     showToast('保存失败，浏览器存储空间可能已满');
     return;
   }
-  elements.foodName.value = '';
-  elements.foodCalories.value = '';
-  updateSaveButton();
-  renderHome();
-  if (dateKey(record.timestamp) === statsDate) renderChart();
+  elements.quickCalories.value = '';
+  updateQuickSaveButton();
+  selectedBinIndex = binIndexForEntry(record);
+  renderChart();
   showToast('热量记录已保存');
 }
 
@@ -216,8 +197,10 @@ function deleteRecord(id) {
   if (!record || !confirm(`删除 ${formatTime(record.timestamp)} 的 ${record.calories} kcal 记录？`)) return;
   entries = entries.filter((entry) => entry.id !== id);
   persistEntries();
+  editingId = null;
   selectedBinIndex = null;
-  renderHome();
+  if (elements.editRecordDialog.open) elements.editRecordDialog.close();
+  if (elements.recordChoiceDialog.open) elements.recordChoiceDialog.close();
   renderChart();
   showToast('记录已删除');
 }
@@ -226,7 +209,6 @@ function openRecordEditor(id) {
   const record = entries.find((entry) => entry.id === id);
   if (!record) return;
   editingId = id;
-  elements.editFoodName.value = record.food || '';
   elements.editFoodCalories.value = record.calories;
   const time = new Date(record.timestamp);
   elements.editRecordTime.value = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
@@ -254,7 +236,6 @@ function saveEditedRecord(event) {
   );
   entries[index] = {
     ...original,
-    food: elements.editFoodName.value.trim(),
     calories,
     timestamp: updatedTime.toISOString()
   };
@@ -268,37 +249,8 @@ function saveEditedRecord(event) {
   editingId = null;
   selectedBinIndex = null;
   elements.editRecordDialog.close();
-  renderHome();
   renderChart();
   showToast('记录已更新');
-}
-
-function restoreRecordScroll() {
-  const target = Math.max(0, Number(uiState.recordScroll) || 0);
-  const restore = () => window.scrollTo(0, target);
-  restore();
-  requestAnimationFrame(() => requestAnimationFrame(restore));
-  setTimeout(restore, 120);
-}
-
-function showView(name) {
-  if (currentView === 'record' && name !== 'record') uiState.recordScroll = Math.max(0, window.scrollY || 0);
-  currentView = name === 'stats' ? 'stats' : 'record';
-  uiState.view = currentView;
-  uiState.statsDate = statsDate;
-  persistUiState();
-  const showStats = currentView === 'stats';
-  document.documentElement.classList.toggle('stats-active', showStats);
-  document.body.classList.toggle('stats-active', showStats);
-  elements.recordView.hidden = showStats;
-  elements.statsView.hidden = !showStats;
-  elements.navButtons.forEach((button) => {
-    const active = button.dataset.view === currentView;
-    button.classList.toggle('is-active', active);
-    active ? button.setAttribute('aria-current', 'page') : button.removeAttribute('aria-current');
-  });
-  if (showStats) requestAnimationFrame(renderChart);
-  else restoreRecordScroll();
 }
 
 function moveStatsDay(offset) {
@@ -333,47 +285,7 @@ function groupedCalories() {
   return groups.filter((group) => group.total > 0);
 }
 
-function renderStatsFoodRecords() {
-  const foodRecords = calorieEntriesForStats().filter((entry) => String(entry.food || '').trim());
-  elements.statsFoodRecords.innerHTML = foodRecords.map((entry) => `<article class="stats-food-row">
-    <time class="stats-food-time" datetime="${entry.timestamp}">${formatTime(entry.timestamp)}</time>
-    <div class="stats-food-name">${escapeHtml(entry.food)}</div>
-    <div class="stats-food-calories">${entry.calories} kcal</div>
-  </article>`).join('');
-}
-
-function foodLabelForGroup(group) {
-  return group.entries
-    .map((entry) => String(entry.food || '').trim())
-    .filter(Boolean)
-    .join('、');
-}
-
-function wrapChartLabel(ctx, text, maxWidth, maxLines = 5) {
-  if (!text) return [];
-  const characters = Array.from(text);
-  const lines = [];
-  let current = '';
-  characters.forEach((character) => {
-    const candidate = current + character;
-    if (current && ctx.measureText(candidate).width > maxWidth) {
-      lines.push(current);
-      current = character;
-    } else {
-      current = candidate;
-    }
-  });
-  if (current) lines.push(current);
-  if (lines.length <= maxLines) return lines;
-  const visible = lines.slice(0, maxLines);
-  let last = visible[maxLines - 1];
-  while (last && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
-  visible[maxLines - 1] = `${last}…`;
-  return visible;
-}
-
 function renderChart() {
-  renderStatsFoodRecords();
   const bounds = elements.chartWrap.getBoundingClientRect();
   if (!bounds.width || !bounds.height) return;
   const canvas = elements.chart;
@@ -395,19 +307,10 @@ function renderChart() {
   const plotLeft = compact ? 27 : 30;
   const plotRight = bounds.width - 2;
   const binWidth = (plotRight - plotLeft) / TIME_BINS.length;
-  const foodFontSize = 7;
-  const foodLineHeight = 8;
-  ctx.font = `${foodFontSize}px system-ui, sans-serif`;
-  const over1000LabelLines = groups
-    .filter((group) => group.total > 1000)
-    .map((group) => wrapChartLabel(ctx, foodLabelForGroup(group), Math.max(7, binWidth - 2)).length);
-  const over1000TopSpace = over1000LabelLines.length
-    ? Math.max(20, Math.max(...over1000LabelLines) * foodLineHeight + 13)
-    : 0;
   const plot = {
     left: plotLeft,
     right: plotRight,
-    top: (compact ? 13 : 20) + over1000TopSpace,
+    top: compact ? 13 : 20,
     bottom: bounds.height - (compact ? 28 : 34)
   };
   const plotHeight = plot.bottom - plot.top;
@@ -491,35 +394,71 @@ function renderChart() {
     ctx.fillStyle = '#47443e';
     ctx.fillText(label, centerX, labelY);
 
-    const foodLabel = foodLabelForGroup(bar);
-    if (!foodLabel) return;
-    ctx.font = `${foodFontSize}px system-ui, sans-serif`;
-    const lines = wrapChartLabel(ctx, foodLabel, Math.max(7, binWidth - 2));
-    const foodBottom = labelY - calorieFontSize - 2;
-    const startY = Math.max(1, foodBottom - lines.length * foodLineHeight);
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = '#88847c';
-    lines.forEach((line, index) => ctx.fillText(line, centerX, startY + index * foodLineHeight));
-    ctx.font = `600 ${calorieFontSize}px system-ui, sans-serif`;
-    ctx.textBaseline = 'bottom';
   });
 
   const selected = chartBars.find((bar) => bar.binIndex === selectedBinIndex);
   if (selected) {
-    const foods = selected.entries.map((entry) => String(entry.food || '').trim()).filter(Boolean);
-    const foodText = foods.length ? foods.join('、') : '未填写食物名称';
-    elements.chartTooltip.textContent = `${selected.detailLabel}点 ｜ ${foodText} ｜ ${selected.total} kcal`;
+    elements.chartTooltip.textContent = `${selected.detailLabel}点 ｜ ${selected.total} kcal`;
     elements.chartTooltip.hidden = false;
   }
 }
 
-function selectChartBar(event) {
+function chartBarAt(clientX, clientY) {
   const rect = elements.chart.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const y = event.clientY - rect.top;
-  const hit = chartBars.find((bar) => x >= bar.x - 5 && x <= bar.x + bar.width + 5 && y >= bar.y - 8 && y <= bar.y + bar.height + 4);
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  return chartBars.find((bar) => x >= bar.x - 5 && x <= bar.x + bar.width + 5 && y >= bar.y - 8 && y <= bar.y + bar.height + 4);
+}
+
+function selectChartBar(event) {
+  const hit = chartBarAt(event.clientX, event.clientY);
   selectedBinIndex = hit ? hit.binIndex : null;
   renderChart();
+}
+
+function openBarEditor(bar) {
+  if (!bar?.entries?.length) return;
+  selectedBinIndex = bar.binIndex;
+  renderChart();
+  if (bar.entries.length === 1) {
+    openRecordEditor(bar.entries[0].id);
+    return;
+  }
+  elements.recordChoiceList.innerHTML = bar.entries.map((entry) => `<button class="record-choice-button" type="button" data-choice-record="${entry.id}"><time datetime="${entry.timestamp}">${formatTime(entry.timestamp)}</time><strong>${Number(entry.calories).toLocaleString('zh-CN')} kcal</strong></button>`).join('');
+  elements.recordChoiceDialog.showModal();
+}
+
+function startChartLongPress(event) {
+  if (event.pointerType === 'mouse' && event.button !== 0) return;
+  clearTimeout(longPressTimer);
+  longPressTriggered = false;
+  longPressStart = { x:event.clientX, y:event.clientY };
+  const bar = chartBarAt(event.clientX, event.clientY);
+  if (!bar) return;
+  longPressTimer = setTimeout(() => {
+    longPressTriggered = true;
+    navigator.vibrate?.(35);
+    openBarEditor(bar);
+  }, 550);
+}
+
+function moveChartLongPress(event) {
+  if (!longPressStart || !longPressTimer) return;
+  if (Math.hypot(event.clientX - longPressStart.x, event.clientY - longPressStart.y) > 10) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}
+
+function finishChartPress(event) {
+  clearTimeout(longPressTimer);
+  longPressTimer = null;
+  longPressStart = null;
+  if (longPressTriggered) {
+    longPressTriggered = false;
+    return;
+  }
+  selectChartBar(event);
 }
 
 function showToast(message) {
@@ -529,20 +468,21 @@ function showToast(message) {
   toastTimer = setTimeout(() => elements.toast.classList.remove('is-visible'), 1900);
 }
 
-elements.foodCalories.addEventListener('input', updateSaveButton);
-elements.saveButton.addEventListener('click', saveRecord);
-elements.todayRecords.addEventListener('click', (event) => {
-  const deleteButton = event.target.closest('[data-delete]');
-  if (deleteButton) { deleteRecord(deleteButton.dataset.delete); return; }
-  const editButton = event.target.closest('[data-edit]');
-  if (editButton) openRecordEditor(editButton.dataset.edit);
-});
+elements.quickCalories.addEventListener('input', updateQuickSaveButton);
+elements.quickEntryForm.addEventListener('submit', saveQuickRecord);
 elements.editRecordForm.addEventListener('submit', saveEditedRecord);
+elements.deleteEditRecord.addEventListener('click', () => { if (editingId) deleteRecord(editingId); });
 document.querySelectorAll('[data-close-edit]').forEach((button) => button.addEventListener('click', () => {
   editingId = null;
   elements.editRecordDialog.close();
 }));
-elements.navButtons.forEach((button) => button.addEventListener('click', () => showView(button.dataset.view)));
+elements.recordChoiceList.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-choice-record]');
+  if (!button) return;
+  elements.recordChoiceDialog.close();
+  openRecordEditor(button.dataset.choiceRecord);
+});
+document.querySelectorAll('[data-close-choice]').forEach((button) => button.addEventListener('click', () => elements.recordChoiceDialog.close()));
 document.querySelector('#previous-day').addEventListener('click', () => moveStatsDay(-1));
 elements.nextDay.addEventListener('click', () => moveStatsDay(1));
 elements.statsDateInput.addEventListener('change', () => {
@@ -552,35 +492,32 @@ elements.statsDateInput.addEventListener('change', () => {
   rememberUiState();
   renderChart();
 });
-elements.chart.addEventListener('pointerdown', selectChartBar);
+elements.chart.addEventListener('pointerdown', startChartLongPress);
+elements.chart.addEventListener('pointermove', moveChartLongPress);
+elements.chart.addEventListener('pointerup', finishChartPress);
+elements.chart.addEventListener('pointercancel', () => { clearTimeout(longPressTimer); longPressTimer=null; longPressStart=null; });
+elements.chart.addEventListener('contextmenu', (event) => event.preventDefault());
 
 if ('ResizeObserver' in window) {
   const resizeObserver = new ResizeObserver(() => {
-    if (!elements.statsView.hidden) renderChart();
+    renderChart();
   });
   resizeObserver.observe(elements.chartWrap);
 } else {
-  window.addEventListener('resize', () => { if (!elements.statsView.hidden) renderChart(); });
+  window.addEventListener('resize', renderChart);
 }
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) rememberUiState();
   else {
-    renderHome();
+    renderHeader();
     if (statsDate > dateKey(new Date())) statsDate = dateKey(new Date());
-    if (currentView === 'stats') renderChart();
-    else restoreRecordScroll();
+    renderChart();
   }
 });
-window.addEventListener('scroll', () => {
-  if (currentView !== 'record') return;
-  uiState.recordScroll = Math.max(0, window.scrollY || 0);
-  clearTimeout(scrollSaveTimer);
-  scrollSaveTimer = setTimeout(persistUiState, 180);
-}, { passive: true });
 window.addEventListener('pagehide', rememberUiState);
-window.addEventListener('pageshow', () => showView(currentView));
+window.addEventListener('pageshow', () => { renderHeader(); requestAnimationFrame(renderChart); });
 
-renderHome();
-updateSaveButton();
-showView(currentView);
+renderHeader();
+updateQuickSaveButton();
+requestAnimationFrame(renderChart);

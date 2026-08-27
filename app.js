@@ -472,6 +472,7 @@ function renderChart() {
 
   const compact = bounds.height < 310;
   const groups = groupedCalories();
+  const dailyTotal = groups.reduce((sum, group) => sum + group.total, 0);
   const plotLeft = compact ? 27 : 30;
   const plotRight = bounds.width - 2;
   const binWidth = (plotRight - plotLeft) / TIME_BINS.length;
@@ -488,6 +489,12 @@ function renderChart() {
     if (value > 1000) return plot.top;
     return plot.bottom - (value / 100) * calorieUnit;
   };
+
+  ctx.font = `700 ${compact ? 8 : 11}px system-ui, sans-serif`;
+  ctx.fillStyle = '#47443e';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`${dailyTotal.toLocaleString('zh-CN')} kcal`, (plot.left + plot.right) / 2, compact ? 1 : 2);
 
   ctx.font = `${compact ? 7 : 8}px system-ui, sans-serif`;
   ctx.textAlign = 'right';

@@ -494,7 +494,7 @@ function renderChart() {
   ctx.fillStyle = '#47443e';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(`${dailyTotal.toLocaleString('zh-CN')} kcal`, (plot.left + plot.right) / 2, compact ? 1 : 2);
+  ctx.fillText(dailyTotal.toLocaleString('zh-CN'), bounds.width / 2, compact ? 1 : 2);
 
   ctx.font = `${compact ? 7 : 8}px system-ui, sans-serif`;
   ctx.textAlign = 'right';

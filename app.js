@@ -38,6 +38,7 @@ const elements = {
   todayLabel: document.querySelector('#today-label'),
   statsView: document.querySelector('#stats-view'),
   quickEntryForm: document.querySelector('#quick-entry-form'),
+  quickFood: document.querySelector('#quick-food'),
   quickCalories: document.querySelector('#quick-calories'),
   quickSaveButton: document.querySelector('#quick-save-button'),
   calculatorOpenButton: document.querySelector('#calculator-open-button'),
@@ -51,6 +52,7 @@ const elements = {
   addConvertedButton: document.querySelector('#add-converted-button'),
   editRecordDialog: document.querySelector('#edit-record-dialog'),
   editRecordForm: document.querySelector('#edit-record-form'),
+  editFoodName: document.querySelector('#edit-food-name'),
   editFoodCalories: document.querySelector('#edit-food-calories'),
   editRecordTime: document.querySelector('#edit-record-time'),
   deleteEditRecord: document.querySelector('#delete-edit-record'),
@@ -338,7 +340,7 @@ function saveQuickRecord(event) {
   const record = {
     id: makeId(),
     timestamp: selectedDate.toISOString(),
-    food: '',
+    food: elements.quickFood.value.trim(),
     calories
   };
   entries.push(record);
@@ -349,6 +351,7 @@ function saveQuickRecord(event) {
     showToast('保存失败，浏览器存储空间可能已满');
     return;
   }
+  elements.quickFood.value = '';
   elements.quickCalories.value = '';
   calculatorExpression = '';
   calculatorHistory = '';
@@ -377,6 +380,7 @@ function openRecordEditor(id) {
   const record = entries.find((entry) => entry.id === id);
   if (!record) return;
   editingId = id;
+  elements.editFoodName.value = record.food || '';
   elements.editFoodCalories.value = record.calories;
   const time = new Date(record.timestamp);
   elements.editRecordTime.value = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
@@ -404,6 +408,7 @@ function saveEditedRecord(event) {
   );
   entries[index] = {
     ...original,
+    food: elements.editFoodName.value.trim(),
     calories,
     timestamp: updatedTime.toISOString()
   };
@@ -573,7 +578,14 @@ function renderChart() {
 
   const selected = chartBars.find((bar) => bar.binIndex === selectedBinIndex);
   if (selected) {
-    elements.chartTooltip.textContent = `${selected.detailLabel}点 ｜ ${selected.total} kcal`;
+    const namedEntries = selected.entries.filter((entry) => String(entry.food || '').trim());
+    const foodDetails = namedEntries
+      .map((entry) => `${formatTime(entry.timestamp)}　${String(entry.food).trim()}　${Number(entry.calories).toLocaleString('zh-CN')} kcal`)
+      .join('\n');
+    elements.chartTooltip.style.whiteSpace = foodDetails ? 'pre-line' : 'normal';
+    elements.chartTooltip.textContent = foodDetails
+      ? `${selected.detailLabel}点 ｜ 合计 ${selected.total.toLocaleString('zh-CN')} kcal\n${foodDetails}`
+      : `${selected.detailLabel}点 ｜ ${selected.total.toLocaleString('zh-CN')} kcal`;
     elements.chartTooltip.hidden = false;
   }
 }
@@ -599,7 +611,7 @@ function openBarEditor(bar) {
     openRecordEditor(bar.entries[0].id);
     return;
   }
-  elements.recordChoiceList.innerHTML = bar.entries.map((entry) => `<button class="record-choice-button" type="button" data-choice-record="${entry.id}"><time datetime="${entry.timestamp}">${formatTime(entry.timestamp)}</time><strong>${Number(entry.calories).toLocaleString('zh-CN')} kcal</strong></button>`).join('');
+  elements.recordChoiceList.innerHTML = bar.entries.map((entry) => `<button class="record-choice-button" type="button" data-choice-record="${entry.id}"><time datetime="${entry.timestamp}">${formatTime(entry.timestamp)}</time><strong>${escapeHtml(entry.food || '未命名')} · ${Number(entry.calories).toLocaleString('zh-CN')} kcal</strong></button>`).join('');
   elements.recordChoiceDialog.showModal();
 }
 

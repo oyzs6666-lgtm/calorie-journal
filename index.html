@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="今日热量">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="styles.css?v=21">
+  <link rel="stylesheet" href="styles.css?v=22">
   <title>今日热量 · 摄入记录</title>
 </head>
 <body class="stats-active">
@@ -42,6 +42,10 @@
           </div>
         </div>
         <form class="quick-entry" id="quick-entry-form">
+          <label class="quick-food-field">
+            <span class="visually-hidden">食物名称</span>
+            <input id="quick-food" type="text" maxlength="60" autocomplete="off" placeholder="食物名称（选填）">
+          </label>
           <label class="unit-input">
             <span class="visually-hidden">热量数值</span>
             <input id="quick-calories" type="number" min="1" max="99999" inputmode="decimal" placeholder="输入热量">
@@ -50,7 +54,7 @@
           <button class="calculator-open-button" id="calculator-open-button" type="button" aria-label="打开计算器">▦</button>
           <button class="quick-save-button" id="quick-save-button" type="submit" disabled>记录</button>
         </form>
-        <p class="chart-action-hint">保存时使用当前时间；长按柱子可修改热量、时间或删除。</p>
+        <p class="chart-action-hint">保存时使用当前时间；长按柱子可修改名称、热量、时间或删除。</p>
       </section>
     </main>
   </div>
@@ -63,6 +67,10 @@
       </div>
       <p class="dialog-intro">修改后，柱状图会自动重新计算。</p>
       <div class="edit-fields calorie-edit-fields">
+        <label>
+          <span>食物名称</span>
+          <input id="edit-food-name" type="text" maxlength="60" autocomplete="off" placeholder="选填">
+        </label>
         <label>
           <span>热量</span>
           <span class="unit-input">
@@ -134,7 +142,7 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=22"></script>
   <script>
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
